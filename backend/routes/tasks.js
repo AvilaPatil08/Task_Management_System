@@ -1,22 +1,70 @@
 const express = require("express");
-const mongoose = require("mongoose");
-const bodyParser = require("body-parser");
+const Task = require("../models/task");
 
-const app = express();
+const router = express.Router();
 
-// Middleware
-app.use(bodyParser.json());
-
-// MongoDB Connection
-mongoose.connect("mongodb://localhost/taskmanager", {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+// Create a task
+router.post("/tasks", async (req, res) => {
+  try {
+    const task = new Task(req.body);
+    await task.save();
+    res.status(201).send(task);
+  } catch (error) {
+    res.status(400).send(error);
+  }
 });
-mongoose.connection.on("error", (error) => console.error(error));
-mongoose.connection.once("open", () => console.log("Connected to MongoDB"));
 
-// Start Server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+// Read all tasks
+router.get("/tasks", async (req, res) => {
+  try {
+    const tasks = await Task.find();
+    res.send(tasks);
+  } catch (error) {
+    res.status(500).send(error);
+  }
 });
+
+// Update a task
+router.patch("/tasks/:id", async (req, res) => {
+  const updates = Object.keys(req.body);
+  const allowedUpdates = ["title", "description"];
+  const isValidOperation = updates.every((update) =>
+    allowedUpdates.includes(update)
+  );
+
+  if (!isValidOperation) {
+    return res.status(400).send({ error: "Invalid updates!" });
+  }
+
+  try {
+    const task = await Task.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!task) {
+      return res.status(404).send();
+    }
+
+    res.send(task);
+  } catch (error) {
+    res.status(400).send(error);
+  }
+});
+
+// Delete a task
+router.delete("/tasks/:id", async (req, res) => {
+  try {
+    const task = await Task.findByIdAndDelete(req.params.id);
+
+    if (!task) {
+      return res.status(404).send();
+    }
+
+    res.send(task);
+  } catch (error) {
+    res.status(500).send(error);
+  }
+});
+
+module.exports = router;
